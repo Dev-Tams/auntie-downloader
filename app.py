@@ -1,3 +1,4 @@
+import datetime
 from flask import Flask, request, send_file, render_template_string
 import yt_dlp
 import os
@@ -82,7 +83,12 @@ def index():
     if request.method == "POST":
         url = request.form["url"]
         media_type = request.form["type"]
+        user_ip = request.remote_addr  # Capture client IP
+
+        # Log with IP
+        print(f"[{datetime.datetime.now()}] {user_ip} requested {media_type.upper()} from {url}")
         tmp_filename = f"{uuid.uuid4()}.%(ext)s"
+        
 
         ydl_opts = {
             "outtmpl": tmp_filename,
