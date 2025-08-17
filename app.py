@@ -1,5 +1,5 @@
 import datetime
-from flask import Flask, request, send_file, render_template_string
+from flask import Flask, request, redirect
 import yt_dlp
 import os
 import uuid
@@ -106,13 +106,12 @@ def index():
         else:
             ydl_opts.update({"format": "best"})
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-
-        return send_file(filename, as_attachment=True)
-
-    return render_template_string(HTML_PAGE)
+        with yt_dlp.YoutubeDL({"format": "best"}) as ydl:
+            info = ydl.extract_info(url, download=False)
+            video_url = info["url"]
+            
+    
+    return redirect(video_url)
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
