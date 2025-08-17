@@ -4,26 +4,33 @@ import yt_dlp
 app = Flask(__name__)
 
 HTML_PAGE = """
-<form method="POST">
-    Video URL: <input type="text" name="url">
-    <input type="submit" value="Download">
+<!doctype html>
+<title>Video Downloader</title>
+<h1>Enter video URL</h1>
+<form method=post>
+  <input type=text name=url placeholder="Video URL" required>
+  <input type=submit value=Download>
 </form>
 """
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        url = request.form.get("url")
-        if not url:
-            return "No URL provided", 400
+        url = request.form["url"]
 
-        # Extract best video URL (without downloading)
-        with yt_dlp.YoutubeDL({"format": "best"}) as ydl:
-            info = ydl.extract_info(url, download=False)
-            video_url = info["url"]
+        try:
+            # Extract video info but don't download
+            with yt_dlp.YoutubeDL({"format": "best"}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                video_url = info.get("url")
+                if not video_url:
+                    return "Error: Could not get video URL", 400
 
-        # Redirect the user's browser directly to YouTube's CDN URL
-        return redirect(video_url)
+            # Redirect the user directly to the video
+            return redirect(video_url)
+
+        except Exception as e:
+            return f"Error: {str(e)}", 400
 
     return render_template_string(HTML_PAGE)
 
