@@ -34,7 +34,6 @@ HTML_PAGE = """
 </body>
 </html>
 """
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -42,11 +41,12 @@ def index():
         if not url:
             return "<h2>No URL provided</h2><p><a href='/'>Go back</a></p>"
 
+        # Get Netscape-formatted cookies from environment
         cookies_content = os.getenv("YOUTUBE_COOKIES")
         if not cookies_content:
             return "<h2>Server error: cookies not set</h2>"
 
-        # write cookies to a temporary file
+        # Write cookies to a temporary file
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             temp_file.write(cookies_content.encode())
             cookies_file = temp_file.name
@@ -55,16 +55,17 @@ def index():
             ydl_opts = {
                 "quiet": True,
                 "skip_download": True,
-                "cookiefile": cookies_file
+                "cookiefile": cookies_file,
             }
+
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
-                # pick the best available format
+                # Pick the best available format
                 formats = info.get("formats", [])
                 video_url = formats[-1]["url"] if formats else info.get("url")
 
                 if not video_url:
-                    return f"<h2>Could not get video URL</h2><p><a href='/'>Go back</a></p>"
+                    return "<h2>Could not get video URL</h2><p><a href='/'>Go back</a></p>"
 
             return redirect(video_url)
 
@@ -72,9 +73,12 @@ def index():
             return f"<h2>Error: {e}</h2><p><a href='/'>Go back</a></p>"
 
         finally:
+            # Clean up temporary cookie file
             os.remove(cookies_file)
 
+    # Render main HTML page
     return render_template_string(HTML_PAGE)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
