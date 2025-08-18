@@ -1,8 +1,7 @@
-from flask import Flask, request, redirect, render_template_string
+from flask import Flask, request, redirect, render_template_string, send_file, after_this_request
 import yt_dlp
 import tempfile
 import os
-
 app = Flask(__name__)
 
 HTML_PAGE = """
@@ -41,44 +40,56 @@ def index():
         if not url:
             return "<h2>No URL provided</h2><p><a href='/'>Go back</a></p>"
 
-        # Get Netscape-formatted cookies from environment
         cookies_content = os.getenv("YOUTUBE_COOKIES")
         if not cookies_content:
             return "<h2>Server error: cookies not set</h2>"
 
-        # Write cookies to a temporary file
-        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-            temp_file.write(cookies_content.encode())
-            cookies_file = temp_file.name
+        # create temp files for video and cookies
+        temp_video = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+        temp_video.close()  # close so yt_dlp can write to it
+        temp_cookie = tempfile.NamedTemporaryFile(delete=False)
+        temp_cookie.write(cookies_content.encode())
+        temp_cookie.close()
 
         try:
             ydl_opts = {
                 "quiet": True,
-                "skip_download": True,
-                "cookiefile": cookies_file,
+                "format": "bestvideo+bestaudio/best",
+                "outtmpl": temp_video.name,
+                "merge_output_format": "mp4",
+                "cookiefile": temp_cookie.name
             }
-
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                # Pick the best available format
-                formats = info.get("formats", [])
-                video_url = formats[-1]["url"] if formats else info.get("url")
+                ydl.download([url])
 
-                if not video_url:
-                    return "<h2>Could not get video URL</h2><p><a href='/'>Go back</a></p>"
-
-            return redirect(video_url)
+            # stream the file to user
+            return redirect(f"/download/{os.path.basename(temp_video.name)}")
 
         except Exception as e:
             return f"<h2>Error: {e}</h2><p><a href='/'>Go back</a></p>"
 
         finally:
-            # Clean up temporary cookie file
-            os.remove(cookies_file)
+            # delete cookie file immediately
+            try:
+                os.remove(temp_cookie.name)
+            except:
+                pass
 
-    # Render main HTML page
     return render_template_string(HTML_PAGE)
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+# serve the temp video and delete after sending
+@app.route("/download/<filename>")
+def download_file(filename):
+    path = os.path.join(tempfile.gettempdir(), filename)
+    if not os.path.exists(path):
+        return "<h2>File not found</h2>"
+
+    from flask import send_file
+    response = send_file(path, as_attachment=True)
+    # delete file after sending
+    try:
+        os.remove(path)
+    except:
+        pass
+    return response
